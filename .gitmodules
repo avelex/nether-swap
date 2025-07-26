@@ -1,0 +1,6 @@
+[submodule "evm/lib/forge-std"]
+	path = evm/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std
+[submodule "evm/lib/cross-chain-swap"]
+	path = evm/lib/cross-chain-swap
+	url = https://github.com/1inch/cross-chain-swap

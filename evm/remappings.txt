@@ -1,0 +1,4 @@
+forge-std/=lib/forge-std/src/
+1inch-cross-chain-swap/=lib/cross-chain-swap/
+1inch-limit-order-protocol/=lib/cross-chain-swap/lib/limit-order-protocol/
+solidity-utils/=lib/cross-chain-swap/lib/solidity-utils/
