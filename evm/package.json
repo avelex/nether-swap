@@ -1,0 +1,49 @@
+{
+  "name": "evm",
+  "version": "1.0.0",
+  "files": [
+    "lib/cross-chain-swap/lib/limit-order-protocol/contracts",
+    "lib/cross-chain-swap/lib/limit-order-protocol/test/helpers"
+  ],
+  "scripts": {
+    "build": "npx hardhat compile",
+    "deploy:arbitrum": "npx hardhat deploy --network arbitrum"
+  },
+  "devDependencies": {
+    "@metamask/eth-sig-util": "8.0.0",
+    "@nomicfoundation/hardhat-chai-matchers": "2.0.8",
+    "@nomicfoundation/hardhat-ethers": "3.0.8",
+    "@nomicfoundation/hardhat-foundry": "^1.2.0",
+    "@nomicfoundation/hardhat-network-helpers": "1.0.12",
+    "@nomicfoundation/hardhat-toolbox": "^6.1.0",
+    "@nomicfoundation/hardhat-verify": "2.0.11",
+    "@uniswap/permit2-sdk": "1.3.0",
+    "chai": "4.5.0",
+    "dotenv": "16.4.5",
+    "eslint": "8.57.1",
+    "eslint-config-standard": "17.1.0",
+    "eslint-plugin-import": "2.31.0",
+    "eslint-plugin-n": "17.13.0",
+    "eslint-plugin-promise": "7.1.0",
+    "ethers": "6.13.4",
+    "hardhat-dependency-compiler": "1.2.1",
+    "hardhat-deploy": "0.14.0",
+    "hardhat-gas-reporter": "1.0.10",
+    "hardhat-tracer": "3.2.1",
+    "rimraf": "6.0.1",
+    "solc": "0.8.28",
+    "solhint": "5.0.3"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.4.0",
+    "@1inch/solidity-utils": "6.6.0",
+    "@chainlink/contracts": "0.8.0",
+    "@ethersproject/abstract-signer": "^5.8.0",
+    "@ethersproject/bytes": "^5.8.0",
+    "@ethersproject/hash": "^5.8.0",
+    "@ethersproject/web": "^5.8.0",
+    "@gnosis.pm/safe-contracts": "1.3.0",
+    "@nomicfoundation/hardhat-foundry": "^1.1.4",
+    "hardhat": "^2.26.1"
+  }
+}

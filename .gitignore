@@ -1,0 +1,17 @@
+# Compiler files
+evm/cache/
+evm/out/
+
+# Ignores development broadcast logs
+!/evm/broadcast
+/evm/broadcast/*/31337/
+/evm/broadcast/**/dry-run/
+
+# Dotenv file
+.env
+
+# Node modules
+evm/node_modules/
+
+# Deployments
+evm/deployments/
