@@ -1,26 +1,26 @@
 import { EvmClient } from './EvmClient';
 import { SuiClient } from './SuiClient';
-import {
-  SwapError,
-  ResolverConfig,
-  EvmSwapOrder,
-} from '../types';
+import { SwapError, ResolverConfig, EvmSwapOrder } from '../types';
 import logger from '../utils/logger';
 import { Interface, Signature, TransactionRequest } from 'ethers';
 import * as Sdk from '@1inch/cross-chain-sdk';
-import Resolver from '../contracts/Resolver.json'
+import Resolver from '../contracts/Resolver.json';
+import { SwapOrderService } from './SwapOrderService';
 
 export class EvmResolver {
+  private swapOrderService: SwapOrderService;
   private evmClient: EvmClient;
   private suiClient: SuiClient;
   private config: ResolverConfig;
-  private readonly resolverContract = new Interface(Resolver.abi)
-  
+  private readonly resolverContract = new Interface(Resolver.abi);
+
   constructor(
+    swapOrderService: SwapOrderService,
     evmClient: EvmClient,
     suiClient: SuiClient,
     config: ResolverConfig
   ) {
+    this.swapOrderService = swapOrderService;
     this.evmClient = evmClient;
     this.suiClient = suiClient;
     this.config = config;
@@ -39,28 +39,12 @@ export class EvmResolver {
         orderHash: swapOrder.base.orderHash,
       });
 
-      const fillAmount = swapOrder.order.makingAmount;
-      const { txHash: orderFillHash, blockHash: _ } =
-        await this.evmClient.send(
-          this.deploySrc(
-            swapOrder.base.userIntent.srcChainId,
-            swapOrder.order,
-            swapOrder.base.orderHash,
-            swapOrder.base.signature!,
-            Sdk.TakerTraits.default()
-              .setExtension(swapOrder.order.extension)
-              .setAmountMode(Sdk.AmountMode.maker)
-              .setAmountThreshold(swapOrder.order.takingAmount),
-            fillAmount
-          )
-        );
-
-      console.log(
-        `[${swapOrder.base.userIntent.srcChainId}]`,
-        `Order ${swapOrder.base.orderHash} filled for ${fillAmount} in tx ${orderFillHash}`
+      const escrowSrcTxHash = await this.deployEscrowSrc(swapOrder);
+      this.swapOrderService.addEscrowSrcTxHash(
+        swapOrder.base.orderHash,
+        escrowSrcTxHash
       );
 
-      //TODO: update order, set EscrowSrcTxHash
       //TODO: deploy dst escrow on SUI
       //TODO: update order, set EscrowDstTxHash
       //TODO: withdraw src escrow on EVM
@@ -145,7 +129,32 @@ export class EvmResolver {
   //   }
   // }
 
-  private deploySrc(
+  public async deployEscrowSrc(swapOrder: EvmSwapOrder): Promise<string> {
+    const fillAmount = swapOrder.order.makingAmount;
+    const deploySrcTx = this.createDeploySrcTx(
+      swapOrder.base.userIntent.srcChainId,
+      swapOrder.order,
+      swapOrder.base.orderHash,
+      swapOrder.base.signature!,
+      Sdk.TakerTraits.default()
+        .setExtension(swapOrder.order.extension)
+        .setAmountMode(Sdk.AmountMode.maker)
+        .setAmountThreshold(swapOrder.order.takingAmount),
+      fillAmount
+    );
+
+    const { txHash: orderFillHash, blockHash: _ } =
+      await this.evmClient.send(deploySrcTx);
+
+    console.log(
+      `[${swapOrder.base.userIntent.srcChainId}]`,
+      `Order ${swapOrder.base.orderHash} filled for ${fillAmount} in tx ${orderFillHash}`
+    );
+
+    return orderFillHash;
+  }
+
+  private createDeploySrcTx(
     chainId: number,
     order: Sdk.EvmCrossChainOrder,
     orderHash: string,
@@ -178,6 +187,17 @@ export class EvmResolver {
         args,
       ]),
       value: order.escrowExtension.srcSafetyDeposit,
+    };
+  }
+
+  private createDeployDstTx(immutables: Sdk.Immutables): TransactionRequest {
+    return {
+      to: this.config.resolver,
+      data: this.resolverContract.encodeFunctionData('deployDst', [
+        immutables.build(),
+        immutables.timeLocks.toSrcTimeLocks().privateCancellation,
+      ]),
+      value: immutables.safetyDeposit,
     };
   }
 

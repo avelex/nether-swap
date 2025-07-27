@@ -35,7 +35,7 @@ router.post(
       userIntent,
     });
 
-    const swapOrder = relayerService.buildSwapOrder(userIntent);
+    const swapOrder = relayerService.buildEvmSwapOrder(userIntent);
 
     if (!swapOrder) {
       const response: ApiResponse = {
@@ -71,7 +71,7 @@ router.post(
       orderHash,
     });
 
-    const txHash = await relayerService.executeSwapOrder(orderHash, signature);
+    const txHash = await relayerService.executeEvmSwapOrder(orderHash, signature);
 
     const executeResponse: ExecuteSwapOrderResponse = {
       success: true,

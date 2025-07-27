@@ -37,7 +37,7 @@ export default class RelayerService {
   /**
    * Build swap order using appropriate resolver
    */
-  public buildSwapOrder(
+  public buildEvmSwapOrder(
     userIntent: UserIntent
   ): Sdk.EIP712TypedData | undefined {
     try {
@@ -87,7 +87,7 @@ export default class RelayerService {
   /**
    * Execute swap order
    */
-  public async executeSwapOrder(
+  public async executeEvmSwapOrder(
     orderHash: string,
     signature: string
   ): Promise<string> {
@@ -242,7 +242,12 @@ export default class RelayerService {
         666
       );
 
-      const ethResolver = new EvmResolver(evmClient, suiClient, ethConfig);
+      const ethResolver = new EvmResolver(
+        swapOrderService,
+        evmClient,
+        suiClient,
+        ethConfig
+      );
 
       relayerService.addResolver(ethConfig.chainId, ethResolver);
     }

@@ -133,6 +133,94 @@ export class SwapOrderService {
     return updatedOrder;
   }
 
+  public addEscrowSrcTxHash(orderHash: string, txHash: string): SwapOrder | undefined {
+    const order = this.orders.get(orderHash);
+    if (!order) {
+      logger.warn('Attempted to add escrow src tx hash to non-existent order', {
+        orderHash,
+      });
+      return undefined;
+    }
+
+    const updatedOrder: SwapOrder = {
+      ...order,
+      escrowSrcTxHash: txHash,
+      updatedAt: new Date(),
+    };
+
+    this.orders.set(orderHash, updatedOrder);
+
+    logger.info('Escrow src tx hash added to order', { orderHash });
+
+    return updatedOrder;
+  }
+
+  public addEscrowDstTxHash(orderHash: string, txHash: string): SwapOrder | undefined {
+    const order = this.orders.get(orderHash);
+    if (!order) {
+      logger.warn('Attempted to add escrow dst tx hash to non-existent order', {
+        orderHash,
+      });
+      return undefined;
+    }
+
+    const updatedOrder: SwapOrder = {
+      ...order,
+      escrowDstTxHash: txHash,
+      updatedAt: new Date(),
+    };
+
+    this.orders.set(orderHash, updatedOrder);
+
+    logger.info('Escrow dst tx hash added to order', { orderHash });
+
+    return updatedOrder;
+  }
+  
+  public addEscrowSrcWithdrawTxHash(orderHash: string, txHash: string): SwapOrder | undefined {
+    const order = this.orders.get(orderHash);
+    if (!order) {
+      logger.warn('Attempted to add escrow src withdraw tx hash to non-existent order', {
+        orderHash,
+      });
+      return undefined;
+    }
+
+    const updatedOrder: SwapOrder = {
+      ...order,
+      escrowSrcWithdrawTxHash: txHash,
+      updatedAt: new Date(),
+    };
+
+    this.orders.set(orderHash, updatedOrder);
+
+    logger.info('Escrow src withdraw tx hash added to order', { orderHash });
+
+    return updatedOrder;
+  }
+
+  public addEscrowDstWithdrawTxHash(orderHash: string, txHash: string): SwapOrder | undefined {
+    const order = this.orders.get(orderHash);
+    if (!order) {
+      logger.warn('Attempted to add escrow dst withdraw tx hash to non-existent order', {
+        orderHash,
+      });
+      return undefined;
+    }
+
+    const updatedOrder: SwapOrder = {
+      ...order,
+      escrowDstWithdrawTxHash: txHash,
+      updatedAt: new Date(),
+    };
+
+    this.orders.set(orderHash, updatedOrder);
+
+    logger.info('Escrow dst withdraw tx hash added to order', { orderHash });
+
+    return updatedOrder;
+  }
+
   /**
    * Get all orders (for debugging/admin)
    */
