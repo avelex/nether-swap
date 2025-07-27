@@ -4,7 +4,6 @@ import {
   UserIntent,
   SwapOrder,
   SwapError,
-  SwapOrderStatus,
   ResolverConfig,
   EvmSwapOrder,
 } from '../types';
@@ -59,7 +58,6 @@ export default class RelayerService {
             base: {
               orderHash,
               userIntent,
-              status: SwapOrderStatus.PENDING,
               createdAt: new Date(),
               updatedAt: new Date(),
             },

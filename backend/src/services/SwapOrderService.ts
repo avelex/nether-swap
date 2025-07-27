@@ -1,4 +1,4 @@
-import { EvmSwapOrder, SwapOrder, SwapOrderStatus } from '../types';
+import { EvmSwapOrder, SwapOrder } from '../types';
 import logger from '../utils/logger';
 
 export class SwapOrderService {
@@ -16,13 +16,13 @@ export class SwapOrderService {
       ...orderData,
       base: {
         ...orderData.base,
-        status: SwapOrderStatus.PENDING,
         createdAt: new Date(),
         updatedAt: new Date(),
       },
     };
 
     this.evmSwapOrders.set(order.base.orderHash, order);
+    this.orders.set(order.base.orderHash, order.base);
 
     // Track orders by user address
     const userAddress = order.base.userIntent.userAddress.toLowerCase();
@@ -97,7 +97,6 @@ export class SwapOrderService {
       base: {
         ...order.base,
         signature,
-        status: SwapOrderStatus.SIGNED,
         updatedAt: new Date(),
       },
     };

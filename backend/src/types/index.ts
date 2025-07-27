@@ -14,9 +14,14 @@ export interface UserIntent {
 export interface SwapOrder {
   orderHash: string;
   userIntent: UserIntent;
-  status: SwapOrderStatus;
   signature?: string;
   secret?: string;
+
+  escrowSrcTxHash?: string;
+  escrowDstTxHash?: string;
+  escrowSrcWithdrawTxHash?: string;
+  escrowDstWithdrawTxHash?: string;
+
   createdAt: Date;
   updatedAt: Date;
   executedAt?: Date;
@@ -28,15 +33,7 @@ export interface EvmSwapOrder {
   order: Sdk.EvmCrossChainOrder;
 }
 
-export enum SwapOrderStatus {
-  PENDING = 'pending',
-  SIGNED = 'signed',
-  SRC_ESCROW_CREATED = 'srcEscrowCreated',
-  DST_ESCROW_CREATED = 'dstEscrowCreated',
-  SRC_ESCROW_WITHD = 'completed',
-  FAILED = 'failed',
-  CANCELLED = 'cancelled',
-}
+
 
 export interface BuildSwapOrderRequest {
   userIntent: UserIntent;
@@ -115,15 +112,21 @@ export class SwapError extends Error {
 }
 
 export class ValidationError extends Error {
-  constructor(message: string, public field?: string) {
+  constructor(
+    message: string,
+    public field?: string
+  ) {
     super(message);
     this.name = 'ValidationError';
   }
 }
 
 export class ChainError extends Error {
-  constructor(message: string, public chainId?: number) {
+  constructor(
+    message: string,
+    public chainId?: number
+  ) {
     super(message);
     this.name = 'ChainError';
   }
-} 
+}

@@ -127,7 +127,6 @@ router.get(
 
     logger.info('Swap order retrieved successfully', {
       orderHash,
-      status: order.status,
     });
 
     return res.status(200).json(response);
