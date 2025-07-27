@@ -1,17 +1,17 @@
+import * as Sdk from '@1inch/cross-chain-sdk';
+
 export interface UserIntent {
   srcChainId: number;
   dstChainId: number;
-  srcToken: string;
-  dstToken: string;
-  amount: string;
   userAddress: string;
-  dstAddress?: string;
-  slippage?: number;
-  deadline?: number;
+  tokenAmount: string;
+  srcChainAsset: string;
+  dstChainAsset: string;
+  hashLock: string;
+  receiver: string;
 }
 
 export interface SwapOrder {
-  id: string;
   orderHash: string;
   userIntent: UserIntent;
   status: SwapOrderStatus;
@@ -20,15 +20,20 @@ export interface SwapOrder {
   createdAt: Date;
   updatedAt: Date;
   executedAt?: Date;
-  txHash?: string;
-  errorMessage?: string;
+}
+
+export interface EvmSwapOrder {
+  base: SwapOrder;
+  typedData: Sdk.EIP712TypedData;
+  order: Sdk.EvmCrossChainOrder;
 }
 
 export enum SwapOrderStatus {
   PENDING = 'pending',
   SIGNED = 'signed',
-  EXECUTING = 'executing',
-  COMPLETED = 'completed',
+  SRC_ESCROW_CREATED = 'srcEscrowCreated',
+  DST_ESCROW_CREATED = 'dstEscrowCreated',
+  SRC_ESCROW_WITHD = 'completed',
   FAILED = 'failed',
   CANCELLED = 'cancelled',
 }
@@ -80,7 +85,6 @@ export interface ApiResponse<T = any> {
   success: boolean;
   data?: T;
   error?: string;
-  timestamp: string;
 }
 
 export interface SwapQuote {
@@ -93,6 +97,9 @@ export interface SwapQuote {
 
 export interface ResolverConfig {
   chainId: number;
+  resolver: string;
+  escrowFactory: string;
+  limitOrder: string;
 }
 
 // Error types

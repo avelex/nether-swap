@@ -1,37 +1,41 @@
-import { SwapOrder, SwapOrderStatus } from '../types';
-import { v4 as uuidv4 } from 'uuid';
+import { EvmSwapOrder, SwapOrder, SwapOrderStatus } from '../types';
 import logger from '../utils/logger';
 
 export class SwapOrderService {
   private orders: Map<string, SwapOrder> = new Map();
   private userOrders: Map<string, string[]> = new Map();
+  private evmSwapOrders: Map<string, EvmSwapOrder> = new Map();
 
   /**
    * Create a new swap order
    */
-  public createSwapOrder(orderData: Omit<SwapOrder, 'id' | 'createdAt' | 'updatedAt'>): SwapOrder {
-    const order: SwapOrder = {
+  public createEvmSwapOrder(
+    orderData: Omit<EvmSwapOrder, 'createdAt' | 'updatedAt'>
+  ): EvmSwapOrder {
+    const order: EvmSwapOrder = {
       ...orderData,
-      id: uuidv4(),
-      status: SwapOrderStatus.PENDING,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      base: {
+        ...orderData.base,
+        status: SwapOrderStatus.PENDING,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
     };
 
-    this.orders.set(order.orderHash, order);
-    
+    this.evmSwapOrders.set(order.base.orderHash, order);
+
     // Track orders by user address
-    const userAddress = order.userIntent.userAddress.toLowerCase();
+    const userAddress = order.base.userIntent.userAddress.toLowerCase();
     if (!this.userOrders.has(userAddress)) {
       this.userOrders.set(userAddress, []);
     }
-    this.userOrders.get(userAddress)!.push(order.orderHash);
+    this.userOrders.get(userAddress)!.push(order.base.orderHash);
 
     logger.info('Swap order created', {
-      orderHash: order.orderHash,
-      userAddress: order.userIntent.userAddress,
-      srcChainId: order.userIntent.srcChainId,
-      dstChainId: order.userIntent.dstChainId,
+      orderHash: order.base.orderHash,
+      userAddress: order.base.userIntent.userAddress,
+      srcChainId: order.base.userIntent.srcChainId,
+      dstChainId: order.base.userIntent.dstChainId,
     });
 
     return order;
@@ -42,6 +46,10 @@ export class SwapOrderService {
    */
   public getOrderByHash(orderHash: string): SwapOrder | undefined {
     return this.orders.get(orderHash);
+  }
+
+  public getEvmOrderByHash(orderHash: string): EvmSwapOrder | undefined {
+    return this.evmSwapOrders.get(orderHash);
   }
 
   /**
@@ -59,54 +67,42 @@ export class SwapOrderService {
   /**
    * Update order status
    */
-  public updateOrderStatus(
-    orderHash: string, 
-    status: SwapOrderStatus, 
-    additionalData?: Partial<SwapOrder>
-  ): SwapOrder | undefined {
+  public updateOrderStatus(orderHash: string): SwapOrder | undefined {
     const order = this.orders.get(orderHash);
     if (!order) {
       logger.warn('Attempted to update non-existent order', { orderHash });
       return undefined;
     }
 
-    const updatedOrder: SwapOrder = {
-      ...order,
-      ...additionalData,
-      status,
-      updatedAt: new Date(),
-      ...(status === SwapOrderStatus.COMPLETED && { executedAt: new Date() }),
-    };
-
-    this.orders.set(orderHash, updatedOrder);
-
-    logger.info('Order status updated', {
-      orderHash,
-      oldStatus: order.status,
-      newStatus: status,
-    });
-
-    return updatedOrder;
+    return order;
   }
 
   /**
    * Add signature to order
    */
-  public addSignature(orderHash: string, signature: string): SwapOrder | undefined {
-    const order = this.orders.get(orderHash);
+  public addEvmSignature(
+    orderHash: string,
+    signature: string
+  ): EvmSwapOrder | undefined {
+    const order = this.evmSwapOrders.get(orderHash);
     if (!order) {
-      logger.warn('Attempted to add signature to non-existent order', { orderHash });
+      logger.warn('Attempted to add signature to non-existent order', {
+        orderHash,
+      });
       return undefined;
     }
 
-    const updatedOrder: SwapOrder = {
+    const updatedOrder: EvmSwapOrder = {
       ...order,
-      signature,
-      status: SwapOrderStatus.SIGNED,
-      updatedAt: new Date(),
+      base: {
+        ...order.base,
+        signature,
+        status: SwapOrderStatus.SIGNED,
+        updatedAt: new Date(),
+      },
     };
 
-    this.orders.set(orderHash, updatedOrder);
+    this.evmSwapOrders.set(orderHash, updatedOrder);
 
     logger.info('Signature added to order', { orderHash });
 
@@ -119,7 +115,9 @@ export class SwapOrderService {
   public addSecret(orderHash: string, secret: string): SwapOrder | undefined {
     const order = this.orders.get(orderHash);
     if (!order) {
-      logger.warn('Attempted to add secret to non-existent order', { orderHash });
+      logger.warn('Attempted to add secret to non-existent order', {
+        orderHash,
+      });
       return undefined;
     }
 
@@ -140,8 +138,9 @@ export class SwapOrderService {
    * Get all orders (for debugging/admin)
    */
   public getAllOrders(): SwapOrder[] {
-    return Array.from(this.orders.values())
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    return Array.from(this.orders.values()).sort(
+      (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+    );
   }
 
   /**
@@ -159,4 +158,4 @@ export class SwapOrderService {
     this.userOrders.clear();
     logger.info('All orders cleared');
   }
-} 
+}

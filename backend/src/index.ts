@@ -87,17 +87,6 @@ async function startServer(): Promise<void> {
         environment: process.env.NODE_ENV || 'development',
         nodeVersion: process.version,
       });
-
-      logger.info('Available endpoints:', {
-        healthCheck: `http://${host}:${port}/health`,
-        buildOrder: `http://${host}:${port}/api/swap/eth_to_sui/build`,
-        executeOrder: `http://${host}:${port}/api/swap/eth_to_sui`,
-        getOrder: `http://${host}:${port}/api/swap/:id`,
-        getUserOrders: `http://${host}:${port}/api/swap/user/:address`,
-        getQuote: `http://${host}:${port}/api/swap/quote`,
-        getChains: `http://${host}:${port}/api/swap/chains`,
-        getStats: `http://${host}:${port}/api/swap/stats`,
-      });
     });
 
     // Graceful shutdown
