@@ -13,7 +13,6 @@ import { asyncHandler } from '../middleware/errorHandler';
 import {
   UserIntent,
   ExecuteSwapOrderRequest,
-  ExecuteSwapOrderResponse,
   RevealSecretRequest,
   ApiResponse,
 } from '../types';
@@ -71,25 +70,11 @@ router.post(
       orderHash,
     });
 
-    const txHash = await relayerService.executeEvmSwapOrder(orderHash, signature);
+    res.status(200).send('Request received and processing initiated');
 
-    const executeResponse: ExecuteSwapOrderResponse = {
-      success: true,
-      txHash,
-      message: 'Swap order executed successfully',
-    };
+    await relayerService.executeEvmSwapOrder(orderHash, signature);
 
-    const response: ApiResponse<ExecuteSwapOrderResponse> = {
-      success: true,
-      data: executeResponse,
-    };
-
-    logger.info('Swap order executed successfully', {
-      orderHash,
-      txHash,
-    });
-
-    return res.status(200).json(response);
+    return;
   })
 );
 
@@ -182,23 +167,11 @@ router.post(
       orderHash,
     });
 
-    const result = await relayerService.revealSecret(orderHash, secret);
+    res.status(200).send('Secret received and processing initiated');
 
-    const response: ApiResponse = {
-      success: true,
-      data: {
-        orderHash,
-        secretRevealed: result,
-        message: 'Secret revealed successfully',
-      },
-    };
+    await relayerService.revealSecret(orderHash, secret);
 
-    logger.info('Secret revealed successfully', {
-      orderHash,
-      ip: req.ip,
-    });
-
-    return res.status(200).json(response);
+    return;
   })
 );
 

@@ -19,21 +19,18 @@ export interface SwapOrder {
 
   escrowSrcTxHash?: string;
   escrowDstTxHash?: string;
-  escrowSrcWithdrawTxHash?: string;
   escrowDstWithdrawTxHash?: string;
+  escrowSrcWithdrawTxHash?: string;
 
   createdAt: Date;
   updatedAt: Date;
   executedAt?: Date;
 }
 
-export interface EvmSwapOrder {
-  base: SwapOrder;
+export interface EvmSwapOrder extends SwapOrder {
   typedData: Sdk.EIP712TypedData;
   order: Sdk.EvmCrossChainOrder;
 }
-
-
 
 export interface BuildSwapOrderRequest {
   userIntent: UserIntent;

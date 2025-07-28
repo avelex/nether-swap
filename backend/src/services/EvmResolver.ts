@@ -1,28 +1,17 @@
 import { EvmClient } from './EvmClient';
-import { SuiClient } from './SuiClient';
-import { SwapError, ResolverConfig, EvmSwapOrder } from '../types';
+import { ResolverConfig, EvmSwapOrder } from '../types';
 import logger from '../utils/logger';
 import { Interface, Signature, TransactionRequest } from 'ethers';
 import * as Sdk from '@1inch/cross-chain-sdk';
 import Resolver from '../contracts/Resolver.json';
-import { SwapOrderService } from './SwapOrderService';
 
 export class EvmResolver {
-  private swapOrderService: SwapOrderService;
   private evmClient: EvmClient;
-  private suiClient: SuiClient;
   private config: ResolverConfig;
   private readonly resolverContract = new Interface(Resolver.abi);
 
-  constructor(
-    swapOrderService: SwapOrderService,
-    evmClient: EvmClient,
-    suiClient: SuiClient,
-    config: ResolverConfig
-  ) {
-    this.swapOrderService = swapOrderService;
+  constructor(evmClient: EvmClient, config: ResolverConfig) {
     this.evmClient = evmClient;
-    this.suiClient = suiClient;
     this.config = config;
 
     logger.info('EvmResolver initialized', {
@@ -30,112 +19,13 @@ export class EvmResolver {
     });
   }
 
-  /**
-   * Execute swap order
-   */
-  public async executeSwapOrder(swapOrder: EvmSwapOrder): Promise<void> {
-    try {
-      logger.info('Executing swap order', {
-        orderHash: swapOrder.base.orderHash,
-      });
-
-      const escrowSrcTxHash = await this.deployEscrowSrc(swapOrder);
-      this.swapOrderService.addEscrowSrcTxHash(
-        swapOrder.base.orderHash,
-        escrowSrcTxHash
-      );
-
-      //TODO: deploy dst escrow on SUI
-      //TODO: update order, set EscrowDstTxHash
-      //TODO: withdraw src escrow on EVM
-      //TODO: update order, set EscrowSrcWithdrawTxHash
-      //TODO: withdraw dst escrow on SUI
-      //TODO: update order, set EscrowDstWithdrawTxHash
-
-      return;
-    } catch (error) {
-      logger.error('Failed to execute swap order', {
-        error,
-        orderHash: swapOrder.base.orderHash,
-      });
-      throw new SwapError(
-        'Failed to execute swap order',
-        'EXECUTE_ORDER_FAILED',
-        { orderHash: swapOrder.base.orderHash }
-      );
-    }
-  }
-
-  /**
-   * Reveal secret for order completion
-   */
-  public async revealSecret(
-    orderHash: string,
-    secret: string
-  ): Promise<boolean> {
-    try {
-      logger.info('Revealing secret', { orderHash });
-
-      // Validate secret format
-      if (!secret || secret.length < 32) {
-        throw new SwapError('Invalid secret format', 'INVALID_SECRET');
-      }
-
-      // In a real implementation, this would interact with smart contracts
-      // For now, we'll simulate the secret reveal process
-
-      logger.info('Secret revealed successfully', { orderHash });
-
-      return true;
-    } catch (error) {
-      logger.error('Failed to reveal secret', { error, orderHash });
-      throw new SwapError('Failed to reveal secret', 'REVEAL_SECRET_FAILED', {
-        orderHash,
-      });
-    }
-  }
-
-  /**
-   * Validate user intent
-   */
-  // private validateUserIntent(userIntent: UserIntent): void {
-  //   if (!userIntent.srcChainId || !userIntent.dstChainId) {
-  //     throw new SwapError(
-  //       'Source and destination chain IDs are required',
-  //       'INVALID_CHAIN_ID'
-  //     );
-  //   }
-
-  //   if (!userIntent.srcChainAsset || !userIntent.dstChainAsset) {
-  //     throw new SwapError(
-  //       'Source and destination tokens are required',
-  //       'INVALID_TOKEN'
-  //     );
-  //   }
-
-  //   if (!userIntent.tokenAmount || parseFloat(userIntent.tokenAmount) <= 0) {
-  //     throw new SwapError('Valid amount is required', 'INVALID_AMOUNT');
-  //   }
-
-  //   if (!userIntent.userAddress || !ethers.isAddress(userIntent.userAddress)) {
-  //     throw new SwapError('Valid user address is required', 'INVALID_ADDRESS');
-  //   }
-
-  //   if (userIntent.srcChainId !== this.config.chainId) {
-  //     throw new SwapError(
-  //       `Resolver only supports chain ${this.config.chainId}`,
-  //       'UNSUPPORTED_CHAIN'
-  //     );
-  //   }
-  // }
-
   public async deployEscrowSrc(swapOrder: EvmSwapOrder): Promise<string> {
     const fillAmount = swapOrder.order.makingAmount;
     const deploySrcTx = this.createDeploySrcTx(
-      swapOrder.base.userIntent.srcChainId,
+      this.config.chainId,
       swapOrder.order,
-      swapOrder.base.orderHash,
-      swapOrder.base.signature!,
+      swapOrder.orderHash,
+      swapOrder.signature!,
       Sdk.TakerTraits.default()
         .setExtension(swapOrder.order.extension)
         .setAmountMode(Sdk.AmountMode.maker)
@@ -143,15 +33,74 @@ export class EvmResolver {
       fillAmount
     );
 
-    const { txHash: orderFillHash, blockHash: _ } =
-      await this.evmClient.send(deploySrcTx);
+    const { txHash, blockHash: _ } = await this.evmClient.send(deploySrcTx);
 
-    console.log(
-      `[${swapOrder.base.userIntent.srcChainId}]`,
-      `Order ${swapOrder.base.orderHash} filled for ${fillAmount} in tx ${orderFillHash}`
-    );
+    logger.info('EscrowSrc deployed', {
+      chainId: this.config.chainId,
+      orderHash: swapOrder.orderHash,
+      txHash,
+    });
 
-    return orderFillHash;
+    return txHash;
+  }
+
+  public async deployEscrowDst(immutables: Sdk.Immutables): Promise<string> {
+    const deployDstTx = this.createDeployDstTx(immutables);
+
+    const { txHash, blockHash: _ } = await this.evmClient.send(deployDstTx);
+
+    logger.info('EscrowDst deployed', {
+      chainId: this.config.chainId,
+      orderHash: immutables.orderHash,
+      txHash,
+    });
+
+    return txHash;
+  }
+
+  public async withdrawEscrowSrc(
+    secret: string,
+    swapOrder: EvmSwapOrder,
+  ): Promise<string> {
+    const immutables = Sdk.Immutables.new({
+      orderHash: Buffer.from(swapOrder.orderHash, 'hex'),
+      hashLock: swapOrder.order.escrowExtension.hashLockInfo,
+      maker: swapOrder.order.maker,
+      taker: Sdk.EvmAddress.fromString(this.config.resolver),
+      token: swapOrder.order.takerAsset,
+      amount: swapOrder.order.takingAmount,
+      safetyDeposit: swapOrder.order.escrowExtension.srcSafetyDeposit,
+      timeLocks: swapOrder.order.escrowExtension.timeLocks,
+    });
+
+    const withdrawTx = this.createWithdrawTx(secret, immutables);
+
+    const { txHash, blockHash: _ } = await this.evmClient.send(withdrawTx);
+
+    logger.info('EscrowSrc withdrawn', {
+      chainId: this.config.chainId,
+      orderHash: immutables.orderHash,
+      txHash,
+    });
+
+    return txHash;
+  }
+
+  public async withdrawEscrowDst(
+    secret: string,
+    immutables: Sdk.Immutables
+  ): Promise<string> {
+    const withdrawTx = this.createWithdrawTx(secret, immutables);
+
+    const { txHash, blockHash: _ } = await this.evmClient.send(withdrawTx);
+
+    logger.info('EscrowDst withdrawn', {
+      chainId: this.config.chainId,
+      orderHash: immutables.orderHash,
+      txHash,
+    });
+
+    return txHash;
   }
 
   private createDeploySrcTx(
@@ -201,30 +150,25 @@ export class EvmResolver {
     };
   }
 
-  /**
-   * Get supported chains
-   */
-  public getSupportedChains(): number[] {
-    return [this.config.chainId, 101]; // EVM chain and SUI
+
+  private createWithdrawTx(
+    secret: string,
+    immutables: Sdk.Immutables
+  ): TransactionRequest {
+    return {
+      to: this.config.resolver,
+      data: this.resolverContract.encodeFunctionData('withdraw', [
+        this.config.escrowFactory,
+        secret,
+        immutables.build(),
+      ]),
+    };
   }
 
-  /**
-   * Get EVM client
-   */
   public getEvmClient(): EvmClient {
     return this.evmClient;
   }
 
-  /**
-   * Get SUI client
-   */
-  public getSuiClient(): SuiClient {
-    return this.suiClient;
-  }
-
-  /**
-   * Get resolver config
-   */
   public getConfig(): ResolverConfig {
     return this.config;
   }
@@ -239,9 +183,5 @@ export class EvmResolver {
 
   public getEvmAddress(): string {
     return this.evmClient.getAddress();
-  }
-
-  public getSuiAddress(): string {
-    return this.suiClient.getAddress();
   }
 }

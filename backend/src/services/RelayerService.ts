@@ -12,7 +12,6 @@ import * as Sdk from '@1inch/cross-chain-sdk';
 import { ethers, parseEther, parseUnits } from 'ethers';
 import { UINT_40_MAX } from '@1inch/byte-utils';
 import { EvmClient } from './EvmClient';
-import { SuiClient } from './SuiClient';
 
 export default class RelayerService {
   private resolvers: Map<number, EvmResolver> = new Map();
@@ -30,7 +29,6 @@ export default class RelayerService {
     this.resolvers.set(chainId, resolver);
     logger.info('Resolver added', {
       chainId,
-      supportedChains: resolver.getSupportedChains(),
     });
   }
 
@@ -55,12 +53,10 @@ export default class RelayerService {
           const orderHash = this.orderHash(typedData);
 
           const swapOrder: EvmSwapOrder = {
-            base: {
-              orderHash,
-              userIntent,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            },
+            orderHash,
+            userIntent,
+            createdAt: new Date(),
+            updatedAt: new Date(),
             typedData,
             order,
           };
@@ -90,11 +86,8 @@ export default class RelayerService {
   public async executeEvmSwapOrder(
     orderHash: string,
     signature: string
-  ): Promise<string> {
+  ): Promise<void> {
     try {
-      logger.info('Executing swap order via relayer', { orderHash });
-
-      // Get order from storage
       const order = this.swapOrderService.getEvmOrderByHash(orderHash);
       if (!order) {
         throw new SwapError('Order not found', 'ORDER_NOT_FOUND', {
@@ -103,24 +96,25 @@ export default class RelayerService {
       }
 
       //TODO: verify signature
-      //TODO: verify status
 
       // Add signature if not already present
-      if (!order.base.signature) {
+      if (!order.signature) {
         this.swapOrderService.addEvmSignature(orderHash, signature);
       }
 
       // Get resolver for source chain
-      const resolver = this.getResolver(order.base.userIntent.srcChainId);
+      const srcResolver = this.getResolver(order.userIntent.srcChainId);
 
-      // Execute order using resolver in background
-      resolver.executeSwapOrder(order);
+      order.signature = signature;
+      const escrowSrcTxHash = await srcResolver.deployEscrowSrc(order);
+      this.swapOrderService.addEscrowSrcTxHash(orderHash, escrowSrcTxHash);
 
-      logger.info('Swap order executed successfully via relayer', {
-        orderHash,
-      });
+      // TODO:
+      // const dstResolver = this.getSuiResolver();
+      // const escrowDstTxHash = await dstResolver.deployEscrowDst(order);
+      // this.swapOrderService.addEscrowDstTxHash(orderHash, escrowDstTxHash);
 
-      return order.base.orderHash;
+      return;
     } catch (error) {
       logger.error('Failed to execute swap order via relayer', {
         error,
@@ -141,33 +135,31 @@ export default class RelayerService {
   /**
    * Reveal secret for order completion
    */
-  public async revealSecret(
-    orderHash: string,
-    secret: string
-  ): Promise<boolean> {
+  public async revealSecret(orderHash: string, secret: string): Promise<void> {
     try {
-      logger.info('Revealing secret via relayer', { orderHash });
-
-      // Get order from storage
-      const order = this.swapOrderService.getOrderByHash(orderHash);
+      const order = this.swapOrderService.getEvmOrderByHash(orderHash);
       if (!order) {
         throw new SwapError('Order not found', 'ORDER_NOT_FOUND', {
           orderHash,
         });
       }
 
-      // Get resolver for source chain
-      const resolver = this.getResolver(order.userIntent.srcChainId);
+      // TODO:
+      // const dstResolver = this.getSuiResolver();
+      // const escrowDstWithdrawTxHash = await dstResolver.withdrawEscrowDst(order);
+      // this.swapOrderService.addEscrowDstWithdrawTxHash(orderHash, escrowDstWithdrawTxHash);
 
-      // Reveal secret using resolver
-      const result = await resolver.revealSecret(orderHash, secret);
+      const srcResolver = this.getResolver(order.userIntent.srcChainId);
+      const escrowSrcWithdrawTxHash = await srcResolver.withdrawEscrowSrc(
+        secret,
+        order
+      );
+      this.swapOrderService.addEscrowSrcWithdrawTxHash(
+        orderHash,
+        escrowSrcWithdrawTxHash
+      );
 
-      // Add secret to order
-      this.swapOrderService.addSecret(orderHash, secret);
-
-      logger.info('Secret revealed successfully via relayer', { orderHash });
-
-      return result;
+      return;
     } catch (error) {
       logger.error('Failed to reveal secret via relayer', { error, orderHash });
       throw new SwapError('Failed to reveal secret', 'RELAYER_REVEAL_FAILED', {
@@ -237,17 +229,12 @@ export default class RelayerService {
         ethConfig.chainId
       );
 
-      const suiClient = new SuiClient(
-        process.env.SUI_RPC_URL || 'https://fullnode.mainnet.sui.io:443',
-        666
-      );
+      // const suiClient = new SuiClient(
+      //   process.env.SUI_RPC_URL || 'https://fullnode.mainnet.sui.io:443',
+      //   666
+      // );
 
-      const ethResolver = new EvmResolver(
-        swapOrderService,
-        evmClient,
-        suiClient,
-        ethConfig
-      );
+      const ethResolver = new EvmResolver(evmClient, ethConfig);
 
       relayerService.addResolver(ethConfig.chainId, ethResolver);
     }

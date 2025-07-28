@@ -14,28 +14,25 @@ export class SwapOrderService {
   ): EvmSwapOrder {
     const order: EvmSwapOrder = {
       ...orderData,
-      base: {
-        ...orderData.base,
         createdAt: new Date(),
         updatedAt: new Date(),
-      },
     };
 
-    this.evmSwapOrders.set(order.base.orderHash, order);
-    this.orders.set(order.base.orderHash, order.base);
+    this.evmSwapOrders.set(order.orderHash, order);
+    this.orders.set(order.orderHash, order);
 
     // Track orders by user address
-    const userAddress = order.base.userIntent.userAddress.toLowerCase();
+    const userAddress = order.userIntent.userAddress.toLowerCase();
     if (!this.userOrders.has(userAddress)) {
       this.userOrders.set(userAddress, []);
     }
-    this.userOrders.get(userAddress)!.push(order.base.orderHash);
+    this.userOrders.get(userAddress)!.push(order.orderHash);
 
     logger.info('Swap order created', {
-      orderHash: order.base.orderHash,
-      userAddress: order.base.userIntent.userAddress,
-      srcChainId: order.base.userIntent.srcChainId,
-      dstChainId: order.base.userIntent.dstChainId,
+      orderHash: order.orderHash,
+      userAddress: order.userIntent.userAddress,
+      srcChainId: order.userIntent.srcChainId,
+      dstChainId: order.userIntent.dstChainId,
     });
 
     return order;
@@ -94,11 +91,8 @@ export class SwapOrderService {
 
     const updatedOrder: EvmSwapOrder = {
       ...order,
-      base: {
-        ...order.base,
-        signature,
-        updatedAt: new Date(),
-      },
+      signature,
+      updatedAt: new Date(),
     };
 
     this.evmSwapOrders.set(orderHash, updatedOrder);
