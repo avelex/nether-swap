@@ -5,16 +5,21 @@ import {
   SwapOrder,
   SwapError,
   ResolverConfig,
+  SuiResolverConfig,
   EvmSwapOrder,
 } from '../types';
+
 import logger from '../utils/logger';
 import * as Sdk from '@1inch/cross-chain-sdk';
 import { ethers, parseEther, parseUnits } from 'ethers';
 import { UINT_40_MAX } from '@1inch/byte-utils';
 import { EvmClient } from './EvmClient';
+import { SuiResolver } from './SuiResolver';
+//import { SuiAddress } from '../domains/addresses/sui-address';
 
 export default class RelayerService {
   private resolvers: Map<number, EvmResolver> = new Map();
+  private suiResolver!: SuiResolver;
   private swapOrderService: SwapOrderService;
 
   constructor(swapOrderService: SwapOrderService) {
@@ -30,6 +35,10 @@ export default class RelayerService {
     logger.info('Resolver added', {
       chainId,
     });
+  }
+  public setSuiResolver(resolver: SuiResolver): void {
+    this.suiResolver = resolver;
+    logger.info('SUI Resolver added');
   }
 
   /**
@@ -105,16 +114,21 @@ export default class RelayerService {
       // Get resolver for source chain
       const srcResolver = this.getResolver(order.userIntent.srcChainId);
 
-      order.signature = signature;
       const escrowSrcTxHash = await srcResolver.deployEscrowSrc(order);
       this.swapOrderService.addEscrowSrcTxHash(orderHash, escrowSrcTxHash);
 
-      // TODO:
-      // const dstResolver = this.getSuiResolver();
-      // const escrowDstTxHash = await dstResolver.deployEscrowDst(order);
-      // this.swapOrderService.addEscrowDstTxHash(orderHash, escrowDstTxHash);
+      // TODO: use getter in case we add more networks
+      const escrowDstTxHash = await this.suiResolver.deployEscroyDst(
+        order.order.receiver.toString(),
+        "0x2::sui::Coin",
+        order.order.takingAmount,
+        order.order.hashLock.toBuffer(),
+        order.order.dstSafetyDeposit,
+      )
+      this.swapOrderService.addEscrowDstTxHash(orderHash, escrowDstTxHash);
 
       return;
+
     } catch (error) {
       logger.error('Failed to execute swap order via relayer', {
         error,
@@ -122,7 +136,8 @@ export default class RelayerService {
       });
 
       // Update order status to failed
-      this.swapOrderService.updateOrderStatus(orderHash); //TODO: add error message
+      //TODO: add error message
+      this.swapOrderService.updateOrderStatus(orderHash); 
 
       throw new SwapError(
         'Failed to execute swap order',
@@ -228,15 +243,16 @@ export default class RelayerService {
         process.env.ETH_PRIVATE_KEY,
         ethConfig.chainId
       );
-
-      // const suiClient = new SuiClient(
-      //   process.env.SUI_RPC_URL || 'https://fullnode.mainnet.sui.io:443',
-      //   666
-      // );
-
       const ethResolver = new EvmResolver(evmClient, ethConfig);
-
       relayerService.addResolver(ethConfig.chainId, ethResolver);
+
+      const suiConfig: SuiResolverConfig = {
+        rpcUrl : process.env.SUI_RPC_URL ||  'https://sui-devnet-endpoint.blockvision.org',
+        resolverKey: process.env.SUI_RESOLVER_KEY || '',
+        resolverCapId: process.env.SUI_RESOLVER_CAP_ID || '0xe918d86bcc0bd7fe32fb4a3de27aa278712738b536e0dbdfd362bda5bf41530a',
+        htlcPackageId: process.env.SUI_HTLC_PACKAGE_ID || '0x8748bca439c6e509d6ec627ebad1746adb730388fab89f468c0f562d4bef963b',
+      }
+      relayerService.setSuiResolver(new SuiResolver(suiConfig));
     }
 
     logger.info('RelayerService created with default configuration');
@@ -283,8 +299,8 @@ export default class RelayerService {
       makingAmount: parseUnits(userIntent.tokenAmount, 6), // TODO: take decimals from config
       takingAmount: parseUnits(userIntent.tokenAmount, 6), // TODO: take decimals from config
       makerAsset: Sdk.EvmAddress.fromString(userIntent.srcChainAsset),
-      takerAsset: Sdk.EvmAddress.fromString(userIntent.dstChainAsset),
-      receiver: Sdk.EvmAddress.fromString(userIntent.receiver),
+      takerAsset: Sdk.EvmAddress.fromString(userIntent.srcChainAsset),
+      receiver: Sdk.EvmAddress.fromString(userIntent.userAddress),
     };
 
     const escrowParams = {

@@ -15,6 +15,8 @@
     "@1inch/byte-utils": "^3.1.0",
     "@1inch/cross-chain-sdk": "^0.2.1-rc.54",
     "@1inch/fusion-sdk": "^2.0.0",
+    "@mysten/sui": "^1.36.2",
+    "js-sha3": "^0.9.3",
     "axios": "^1.6.2",
     "compression": "^1.7.4",
     "cors": "^2.8.5",

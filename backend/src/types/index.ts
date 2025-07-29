@@ -96,6 +96,13 @@ export interface ResolverConfig {
   limitOrder: string;
 }
 
+export interface SuiResolverConfig {
+  rpcUrl: string;
+  resolverKey: string;
+  htlcPackageId: string;
+  resolverCapId: string;
+}
+
 // Error types
 export class SwapError extends Error {
   constructor(
