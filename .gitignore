@@ -12,7 +12,10 @@ evm/out/
 
 # Node modules
 evm/node_modules/
+frontend/node_modules/
 
 # Deployments
 evm/deployments/
 evm/broadcast/
+
+.DS_Store
