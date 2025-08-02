@@ -48,7 +48,7 @@ export function CompactWalletConnection({
         Connect{" "}
         {requiredPair.chain.walletType === "metamask"
           ? "MetaMask"
-          : "Phantom"}
+          : "SUI Wallet"}
       </Button>
     );
   }

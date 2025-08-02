@@ -1,12 +1,14 @@
+// Blockchain network configuration
 export interface Chain {
   id: string;
   name: string;
   symbol: string;
   icon: string;
-  walletType: 'metamask' | 'phantom';
+  walletType: 'metamask' | 'sui'; // Wallet integration type
   rpcUrl: string;
 }
 
+// Token configuration for supported assets
 export interface Token {
   address: string;
   symbol: string;
@@ -16,6 +18,7 @@ export interface Token {
   chainId: string;
 }
 
+// Combined chain and token pairing for UI selection
 export interface ChainTokenPair {
   id: string;
   chainId: string;
@@ -25,6 +28,7 @@ export interface ChainTokenPair {
   token: Token;
 }
 
+// Supported blockchain networks
 export const SUPPORTED_CHAINS: Chain[] = [
   {
     id: 'arbitrum',
@@ -39,13 +43,14 @@ export const SUPPORTED_CHAINS: Chain[] = [
     name: 'Sui',
     symbol: 'SUI',
     icon: 'assets/icons/sui.svg',
-    walletType: 'phantom',
+    walletType: 'sui',
     rpcUrl: 'https://fullnode.mainnet.sui.io'
   }
 ];
 
+// Available tokens across all supported chains
 export const SUPPORTED_TOKENS: Token[] = [
-  // Arbitrum tokens
+  // EVM tokens on Arbitrum
   {
     address: '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9',
     symbol: 'USDT',
@@ -62,7 +67,7 @@ export const SUPPORTED_TOKENS: Token[] = [
     icon: 'assets/icons/usdc.svg',
     chainId: 'arbitrum'
   },
-  // Sui tokens
+  // Native and wrapped tokens on Sui
   {
     address: '0x2::sui::SUI',
     symbol: 'SUI',
@@ -89,7 +94,7 @@ export const SUPPORTED_TOKENS: Token[] = [
   }
 ];
 
-// Create combined chain-token pairs
+// Generate selectable chain-token combinations for the UI
 export const CHAIN_TOKEN_PAIRS: ChainTokenPair[] = SUPPORTED_TOKENS.map(token => {
   const chain = SUPPORTED_CHAINS.find(c => c.id === token.chainId)!;
   return {

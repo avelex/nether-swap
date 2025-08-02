@@ -81,7 +81,7 @@ export function WalletConnection({ requiredChain }: WalletConnectionProps) {
               alt={requiredChain.walletType} 
               className="w-5 h-5"
             />
-            Connect {requiredChain.walletType === 'metamask' ? 'MetaMask' : 'Phantom'}
+            Connect {requiredChain.walletType === 'metamask' ? 'MetaMask' : 'SUI Wallet'}
           </Button>
         </div>
       </Card>
