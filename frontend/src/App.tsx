@@ -203,15 +203,8 @@ function NetherSwap() {
     setIsCalculating(true);
     await new Promise((resolve) => setTimeout(resolve, 500));
 
-    const isSameToken =
-      fromPair.token.symbol === toPair.token.symbol;
-    const exchangeRate = isSameToken
-      ? 0.98 + Math.random() * 0.04
-      : fromPair.token.symbol === 'SUI' && toPair.token.symbol === 'USDC'
-        ? 3.74
-        : fromPair.token.symbol === 'USDC' && toPair.token.symbol === 'SUI'
-          ? 1 / 3.74
-          : 0.5 + Math.random() * 2;
+    // Since all tokens are equal to $1, the exchange rate is always 1:1
+    const exchangeRate = 1.0;
 
     const calculatedAmount = (
       parseFloat(amount) * exchangeRate
@@ -995,20 +988,6 @@ function NetherSwap() {
                     {toPair?.token.symbol}
                   </span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">
-                    Network Fee:
-                  </span>
-                  <span>{fromPair?.chain.id === 'arbitrum' ? '~$0.10' : fromPair?.chain.id === 'ethereum' ? '~$15.00' : '~$0.01'}</span>
-                </div>
-                {isCrossChain && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      Bridge Fee:
-                    </span>
-                    <span>0.1%</span>
-                  </div>
-                )}
               </div>
             )}
 

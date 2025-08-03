@@ -38,11 +38,8 @@ export function SwapInterface({
     // Simulate API call delay
     await new Promise(resolve => setTimeout(resolve, 500));
     
-    // Mock exchange rate (random between 0.95-1.05 for same tokens, or different rates for different tokens)
-    const isSameToken = fromToken.symbol === toToken.symbol;
-    const exchangeRate = isSameToken 
-      ? 0.98 + Math.random() * 0.04  // 0.98-1.02 for same token cross-chain
-      : 0.5 + Math.random() * 2;     // 0.5-2.5 for different tokens
+    // Since all tokens are equal to $1, the exchange rate is always 1:1
+    const exchangeRate = 1.0;
     
     const calculatedAmount = (parseFloat(amount) * exchangeRate).toFixed(6);
     setToAmount(calculatedAmount);
@@ -76,12 +73,6 @@ export function SwapInterface({
   const getEstimatedTime = () => {
     if (!isCrossChain) return '~30 seconds';
     return '~2-5 minutes';
-  };
-
-  const getFee = () => {
-    if (!fromAmount || !fromToken) return '0';
-    const feePercent = isCrossChain ? 0.3 : 0.1; // Higher fee for cross-chain
-    return (parseFloat(fromAmount) * feePercent / 100).toFixed(6);
   };
 
   return (
@@ -156,16 +147,6 @@ export function SwapInterface({
             <span className="text-muted-foreground">Estimated Time:</span>
             <span>{getEstimatedTime()}</span>
           </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Network Fee:</span>
-            <span>{getFee()} {fromToken?.symbol}</span>
-          </div>
-          {isCrossChain && (
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Bridge Fee:</span>
-              <span>0.1%</span>
-            </div>
-          )}
         </div>
       )}
 
