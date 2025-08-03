@@ -15,8 +15,10 @@ import {
   ExecuteSwapOrderRequest,
   RevealSecretRequest,
   ApiResponse,
+  SuiSwapRequest,
 } from '../types';
 import logger from '../utils/logger';
+import { parseUnits } from 'ethers';
 
 const router = express.Router();
 
@@ -197,6 +199,90 @@ router.get(
     };
 
     return res.status(200).json(response);
+  })
+);
+
+/**
+ * Build sponsored transaction from SUI
+ * POST /api/build/from_sui
+ */
+router.post(
+  '/sui_to_any/build',
+  asyncHandler(async (req, res) => {
+    const relayerService = req.app.locals.relayerService as RelayerService;
+    const userIntent: UserIntent = req.body;
+
+    logger.info('Build sponsored tx req received', {userIntent: userIntent});
+
+    try {
+      const amount =
+        userIntent.srcChainAsset === '0x2::sui::SUI'
+          ? parseUnits(userIntent.tokenAmount.toString(), 9)
+          : parseUnits(userIntent.tokenAmount.toString(), 6);
+
+      // Convert hashlock from hex string to Uint8Array
+      const hashlockBytes = new Uint8Array(Buffer.from(userIntent.hashLock.replace('0x', ''), 'hex'));
+      const sponsoredTx = await relayerService.getSuiResolver().buildSponsoredTx(
+        userIntent.userAddress,
+        userIntent.srcChainAsset,
+        Number(amount),
+        hashlockBytes
+      );
+
+      const response: ApiResponse = {
+        success: true,
+        data: sponsoredTx,
+      };
+
+      logger.info('Sponsored transaction built successfully', {
+        userIntent: userIntent,
+        txBytes: sponsoredTx.bytes.substring(0, 20) + '...',
+      });
+
+      return res.status(200).json(response);
+    } catch (error) {
+      const response: ApiResponse = {
+        success: false,
+        error: `Failed to build sponsored transaction: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      };
+      logger.error('Failed to build sponsored transaction', {
+        userIntent,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      return res.status(500).json(response);
+    }
+  })
+);
+
+/**
+ * Deploy srcEscrow with signed transaction
+ * POST /api/deploy/from_sui
+ */
+router.post(
+  '/sui_to_eth',
+  asyncHandler(async (req, res) => {
+    const relayerService = req.app.locals.relayerService as RelayerService;
+    const swapRequest: SuiSwapRequest = req.body;
+
+    try {
+      const order = relayerService.newSuiSwapOrder(swapRequest.userIntent)
+      const response: ApiResponse = {
+        success: true,
+        data: order,
+      };
+      res.status(200).json(response);
+      return await relayerService.executeSuiSwap(swapRequest, order)
+
+    } catch (error) {
+      const response: ApiResponse = {
+        success: false,
+        error: `Failed to make sui_swap ${error instanceof Error ? error.message : 'Unknown error'}`,
+      };
+      logger.error('Failed to make sui swap', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      return res.status(500).json(response);
+    }
   })
 );
 

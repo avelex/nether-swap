@@ -6,8 +6,8 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // HTLC Package ID
-const HTLC_PACKAGE_ID = '0x8748bca439c6e509d6ec627ebad1746adb730388fab89f468c0f562d4bef963b';
-const RESOLVER_CAP_ID = '0xe918d86bcc0bd7fe32fb4a3de27aa278712738b536e0dbdfd362bda5bf41530a';
+const HTLC_PACKAGE_ID = process.env.HTLC_PACKAGE_ID;
+const RESOLVER_CAP_ID = process.env.RESOLVER_CAP_ID;
 const client = new SuiClient({ url: process.env.SUI_RPC });
 
 // =====================================================
