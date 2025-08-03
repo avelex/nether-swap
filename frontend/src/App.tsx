@@ -14,6 +14,9 @@ import { toast } from "sonner";
 import { ethers } from "ethers";
 
 function NetherSwap() {
+  // Backend URL from environment variable with fallback
+  const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
+  
   const [fromPair, setFromPair] =
     useState<ChainTokenPair | null>(null);
   const [toPair, setToPair] = useState<ChainTokenPair | null>(
@@ -102,7 +105,7 @@ function NetherSwap() {
   const checkOrderStatus = async (orderHash: string) => {
     if (!orderHash) return;
     try {
-      const response = await fetch(`http://64.226.101.237:3000/api/swap/${orderHash}`);
+      const response = await fetch(`${BACKEND_URL}/api/swap/${orderHash}`);
       if (response.ok) {
         const data = await response.json();
 
@@ -128,7 +131,7 @@ function NetherSwap() {
           const secret = orderSecrets.get(orderHash);
 
           try {
-            const revealResponse = await fetch(`http://64.226.101.237:3000/api/swap/${orderHash}/reveal`, {
+            const revealResponse = await fetch(`${BACKEND_URL}/api/swap/${orderHash}/reveal`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -327,7 +330,7 @@ function NetherSwap() {
 
         // Step 1: Build order
         toast.info('Building swap order...');
-        const buildResponse = await fetch('http://64.226.101.237:3000/api/swap/eth_to_sui/build', {
+        const buildResponse = await fetch(`${BACKEND_URL}/api/swap/eth_to_sui/build`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -432,7 +435,7 @@ function NetherSwap() {
           orderHash
         };
 
-        const executeResponse = await fetch('http://64.226.101.237:3000/api/swap/eth_to_sui', {
+        const executeResponse = await fetch(`${BACKEND_URL}/api/swap/eth_to_sui`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -516,7 +519,7 @@ function NetherSwap() {
 
         // Step 1: Build order for Sui to Ethereum
         toast.info('Building Sui to Ethereum swap order...');
-        const buildResponse = await fetch('http://64.226.101.237:3000/api/swap/sui_to_any/build', {
+        const buildResponse = await fetch(`${BACKEND_URL}/api/swap/sui_to_any/build`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -665,7 +668,7 @@ function NetherSwap() {
 
           console.log('Sending request to /api/swap/sui_to_eth:', executeRequestBody);
 
-          const executeResponse = await fetch('http://64.226.101.237:3000/api/swap/sui_to_eth', {
+          const executeResponse = await fetch(`${BACKEND_URL}/api/swap/sui_to_eth`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -1083,7 +1086,7 @@ function NetherSwap() {
                             className="font-mono text-xs text-muted-foreground hover:text-blue-600 cursor-pointer"
                             onClick={(e) => {
                               e.stopPropagation();
-                              navigator.clipboard.writeText(`http://64.226.101.237:3000/api/swap/${orderHash}`);
+                              navigator.clipboard.writeText(`${BACKEND_URL}/api/swap/${orderHash}`);
                               toast.success('API URL copied to clipboard');
                             }}
                           >
