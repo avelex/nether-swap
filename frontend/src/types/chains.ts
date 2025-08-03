@@ -52,14 +52,6 @@ export const SUPPORTED_CHAINS: Chain[] = [
 export const SUPPORTED_TOKENS: Token[] = [
   // EVM tokens on Arbitrum
   {
-    address: '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9',
-    symbol: 'USDT',
-    name: 'Tether USD',
-    decimals: 6,
-    icon: 'assets/icons/usdt.svg',
-    chainId: 'arbitrum'
-  },
-  {
     address: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
     symbol: 'USDC',
     name: 'USD Coin',
@@ -77,19 +69,11 @@ export const SUPPORTED_TOKENS: Token[] = [
     chainId: 'sui'
   },
   {
-    address: '0x5d4b302506645c37ff133b98c4b50a5ae14841659738d6d733d59d0d217a93bf::coin::COIN',
+    address: '0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC',
     symbol: 'USDC',
     name: 'USD Coin',
     decimals: 6,
     icon: 'assets/icons/usdc.svg',
-    chainId: 'sui'
-  },
-  {
-    address: '0xc060006111016b8a020ad5b33834984a437aaa7d3c74c18e09a95d48aceab08c::coin::COIN',
-    symbol: 'USDT',
-    name: 'Tether USD',
-    decimals: 6,
-    icon: 'assets/icons/usdt.svg',
     chainId: 'sui'
   }
 ];

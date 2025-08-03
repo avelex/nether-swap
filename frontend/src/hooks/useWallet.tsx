@@ -33,7 +33,7 @@ interface WalletContextType {
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
 
 // SUI RPC client setup - dynamically choose endpoint based on network
-const createSuiClient = (network: 'mainnet' | 'testnet' | 'devnet' = 'testnet') => {
+const createSuiClient = (network: 'mainnet' | 'testnet' | 'devnet' = 'mainnet') => {
   const endpoints = {
     mainnet: 'https://fullnode.mainnet.sui.io:443',
     testnet: 'https://fullnode.testnet.sui.io:443',
@@ -58,16 +58,16 @@ const detectSuiNetwork = async (wallet: any): Promise<'mainnet' | 'testnet' | 'd
       }
     }
     
-    // Default to testnet since most development happens there
-    return 'testnet';
+    // Default to mainnet
+    return 'mainnet';
   } catch (error) {
-    return 'testnet';
+    return 'mainnet';
   }
 };
 
 // Fetch real SUI balance with network detection
 const fetchSuiBalance = async (address: string, wallet?: any): Promise<string> => {
-  const networks: ('testnet' | 'mainnet' | 'devnet')[] = ['testnet', 'mainnet', 'devnet'];
+  const networks: ('testnet' | 'mainnet' | 'devnet')[] = ['mainnet', 'testnet', 'devnet'];
   
   // If wallet is provided, try to detect the network first
   if (wallet) {
@@ -358,6 +358,18 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// Allowlist for supported wallets only (MetaMask handled separately for EVM chains)
+const isAllowedSuiWallet = (wallet: any): boolean => {
+  if (!wallet) return false;
+  
+  const name = wallet.name?.toLowerCase() || '';
+  
+  // Only allow Suiet wallet for SUI connections
+  const allowedSuiWallets = ['suiet', 'sui wallet'];
+  
+  return allowedSuiWallets.some(allowed => name.includes(allowed));
+};
+
 // Comprehensive SUI wallet detection using multiple methods
 // Supports wallet standard protocol and legacy wallet injections
 export const detectSuiWallets = async (): Promise<any[]> => {
@@ -370,6 +382,12 @@ export const detectSuiWallets = async (): Promise<any[]> => {
     const GlobalWallet = {
       walletList: [],
       register: (wallet: any) => {
+        // Only allow whitelisted SUI wallets
+        if (!isAllowedSuiWallet(wallet)) {
+          console.log('Wallet not in allowlist, ignoring:', wallet.name || 'Unknown');
+          return;
+        }
+        
         if (wallet.chains && wallet.chains.some((chain: string) => chain.includes('sui'))) {
           foundWallets.push({ name: wallet.name, wallet: wallet, type: 'standard' });
         }
@@ -380,9 +398,9 @@ export const detectSuiWallets = async (): Promise<any[]> => {
     const handleWalletReady = (event: any) => {
       if (event.detail && event.detail.walletList && Array.isArray(event.detail.walletList)) {
         event.detail.walletList.forEach((wallet: any) => {
-          // Explicitly exclude Phantom wallets
-          if (wallet.name && wallet.name.toLowerCase().includes('phantom')) {
-            console.log('Filtering out Phantom - only dedicated SUI wallets allowed');
+          // Only allow whitelisted SUI wallets
+          if (!isAllowedSuiWallet(wallet)) {
+            console.log('Wallet not in allowlist, ignoring from app-ready event:', wallet.name || 'Unknown');
             return;
           }
 
@@ -410,9 +428,9 @@ export const detectSuiWallets = async (): Promise<any[]> => {
         // Check for wallets in global registry
         if ((window as any).wallets && Array.isArray((window as any).wallets)) {
           (window as any).wallets.forEach((wallet: any) => {
-            // Explicitly exclude Phantom wallets
-            if (wallet.name && wallet.name.toLowerCase().includes('phantom')) {
-              console.log('Skipping Phantom from global registry - SUI wallets only');
+            // Only allow whitelisted SUI wallets
+            if (!isAllowedSuiWallet(wallet)) {
+              console.log('Wallet not in allowlist, ignoring from global registry:', wallet.name || 'Unknown');
               return;
             }
 
@@ -425,8 +443,14 @@ export const detectSuiWallets = async (): Promise<any[]> => {
           });
         }
 
-        // Fallback: Direct detection of wallet window objects
-        if (window.suiWallet) {
+        // Only detect allowed wallet window objects
+        // Block any Phantom-related window objects
+        if ((window as any).phantom) {
+          console.log('Phantom detected in window object - ignoring completely');
+        }
+        
+        // Only allow official Sui Wallet
+        if (window.suiWallet && !((window as any).phantom)) {
           // Wrap legacy SUI Wallet in standard interface
           const standardWallet = {
             name: 'Sui Wallet',
@@ -442,10 +466,9 @@ export const detectSuiWallets = async (): Promise<any[]> => {
           foundWallets.push({ name: 'Sui Wallet (Legacy)', wallet: standardWallet, type: 'legacy' });
         }
 
-
-        // Detect Suiet wallet with various naming conventions
+        // Only detect Suiet wallet (ignore all others)
         const suietProvider = window.suiet || (window as any).Suiet || (window as any).SuietWallet || (window as any).__suiet;
-        if (suietProvider) {
+        if (suietProvider && !((window as any).phantom)) {
           // Wrap legacy Suiet wallet in standard interface
           const standardWallet = {
             name: 'Suiet',

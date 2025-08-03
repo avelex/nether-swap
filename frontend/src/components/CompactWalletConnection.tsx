@@ -35,7 +35,7 @@ export function CompactWalletConnection({
 
   if (!requiredPair) {
     return (
-      <div className="h-9 flex items-center text-xs text-muted-foreground">
+      <div className="h-9 flex items-center text-sm text-muted-foreground">
         Select network first
       </div>
     );

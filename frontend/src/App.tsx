@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { WalletProvider, useWallet } from "./hooks/useWallet";
 import { CompactChainTokenSelector } from "./components/CompactChainTokenSelector";
 import { CompactWalletConnection } from "./components/CompactWalletConnection";
@@ -13,7 +13,7 @@ import { ArrowRightLeft, ArrowDown } from "lucide-react";
 import { toast } from "sonner";
 import { ethers } from "ethers";
 
-function CompactDEX() {
+function NetherSwap() {
   const [fromPair, setFromPair] =
     useState<ChainTokenPair | null>(null);
   const [toPair, setToPair] = useState<ChainTokenPair | null>(
@@ -36,6 +36,18 @@ function CompactDEX() {
     toToken: string;
     toNetwork: string;
   }>>(new Map());
+  const [orderTransactions, setOrderTransactions] = useState<Map<string, {
+    escrowSrcTxHash?: string;
+    escrowDstTxHash?: string;
+    escrowSrcWithdrawTxHash?: string;
+    escrowDstWithdrawTxHash?: string;
+  }>>(new Map());
+  const [orderSecretStatus, setOrderSecretStatus] = useState<Map<string, {
+    revealed: boolean;
+    failed: boolean;
+  }>>(new Map());
+  const [secretRevealAttempted, setSecretRevealAttempted] = useState<Set<string>>(new Set());
+  const secretRevealAttemptedRef = useRef<Set<string>>(new Set());
   const [pollingOrders, setPollingOrders] = useState<Set<string>>(new Set());
 
   const { walletState, resetConnection } = useWallet();
@@ -81,7 +93,7 @@ function CompactDEX() {
       pollingOrders.forEach(orderHash => {
         checkOrderStatus(orderHash);
       });
-    }, 10000); // Poll every 10 seconds
+    }, 2000);
 
     return () => clearInterval(interval);
   }, [pollingOrders]);
@@ -89,8 +101,6 @@ function CompactDEX() {
   // Check order status function
   const checkOrderStatus = async (orderHash: string) => {
     if (!orderHash) return;
-
-    setCheckingStatusFor(prev => new Set(prev).add(orderHash));
     try {
       const response = await fetch(`http://64.226.101.237:3000/api/swap/${orderHash}`);
       if (response.ok) {
@@ -99,45 +109,62 @@ function CompactDEX() {
         // Check transaction hashes to determine actual status
         const escrowSrcTxHash = data.data?.escrowSrcTxHash || data.escrowSrcTxHash;
         const escrowDstTxHash = data.data?.escrowDstTxHash || data.escrowDstTxHash;
+        const escrowSrcWithdrawTxHash = data.data?.escrowSrcWithdrawTxHash || data.escrowSrcWithdrawTxHash;
+        const escrowDstWithdrawTxHash = data.data?.escrowDstWithdrawTxHash || data.escrowDstWithdrawTxHash;
 
-        let status;
-        if (!escrowSrcTxHash || !escrowDstTxHash) {
-          status = 'Pending';
-        } else {
-          // Both transaction hashes are filled, send secret to backend
-          if (orderSecrets.has(orderHash)) {
-            const secret = orderSecrets.get(orderHash);
-            try {
-              const revealResponse = await fetch(`http://64.226.101.237:3000/api/swap/${orderHash}/reveal`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ secret })
+        // Store transaction hashes
+        setOrderTransactions(prev => new Map(prev).set(orderHash, {
+          escrowSrcTxHash,
+          escrowDstTxHash,
+          escrowSrcWithdrawTxHash,
+          escrowDstWithdrawTxHash
+        }));
+
+        // Send secret when both escrow transactions are present (only once)
+        if (escrowSrcTxHash && escrowDstTxHash && orderSecrets.has(orderHash) && !secretRevealAttemptedRef.current.has(orderHash)) {
+          // Mark as attempted immediately in ref to prevent multiple concurrent requests
+          secretRevealAttemptedRef.current.add(orderHash);
+          setSecretRevealAttempted(prev => new Set(prev).add(orderHash));
+          const secret = orderSecrets.get(orderHash);
+
+          try {
+            const revealResponse = await fetch(`http://64.226.101.237:3000/api/swap/${orderHash}/reveal`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ secret })
+            });
+
+            if (revealResponse.ok) {
+              console.log('Secret revealed successfully for order:', orderHash);
+              setOrderSecretStatus(prev => new Map(prev).set(orderHash, { revealed: true, failed: false }));
+              // Remove the secret from memory after successful reveal
+              setOrderSecrets(prev => {
+                const newMap = new Map(prev);
+                newMap.delete(orderHash);
+                return newMap;
               });
-              
-              if (revealResponse.ok) {
-                console.log('Secret revealed successfully for order:', orderHash);
-                // Only show completed if reveal was successful
-                status = data.status || data.state || 'Completed';
-              } else {
-                console.warn('Failed to reveal secret for order:', orderHash, 'Status:', revealResponse.status);
-                // Keep as pending if reveal failed
-                status = 'Pending';
-              }
-            } catch (secretError) {
-              console.warn('Failed to reveal secret for order:', orderHash, secretError);
-              // Keep as pending if reveal failed
-              status = 'Pending';
+            } else {
+              console.warn('Failed to reveal secret for order:', orderHash, 'Status:', revealResponse.status);
+              setOrderSecretStatus(prev => new Map(prev).set(orderHash, { revealed: false, failed: true }));
             }
-          } else {
-            // No secret available, but hashes are filled - still show as completed
-            status = data.status || data.state || 'Completed';
+          } catch (secretError) {
+            console.warn('Failed to reveal secret for order:', orderHash, secretError);
+            setOrderSecretStatus(prev => new Map(prev).set(orderHash, { revealed: false, failed: true }));
           }
         }
 
+        let status;
+        if (!escrowSrcTxHash || !escrowDstTxHash || !escrowSrcWithdrawTxHash || !escrowDstWithdrawTxHash) {
+          status = 'Pending';
+        } else {
+          // All four transaction hashes are present - order is completed
+          status = data.status || data.state || 'Completed';
+        }
+
         setOrderStatuses(prev => new Map(prev).set(orderHash, status));
-        
+
         // Stop polling if order is completed or failed
         if (status === 'Completed' || status === 'error' || status === 'failed') {
           setPollingOrders(prev => {
@@ -164,11 +191,6 @@ function CompactDEX() {
         return newSet;
       });
     }
-    setCheckingStatusFor(prev => {
-      const newSet = new Set(prev);
-      newSet.delete(orderHash);
-      return newSet;
-    });
   };
 
   // Mock exchange rate calculation
@@ -182,9 +204,9 @@ function CompactDEX() {
       fromPair.token.symbol === toPair.token.symbol;
     const exchangeRate = isSameToken
       ? 0.98 + Math.random() * 0.04
-      : fromPair.token.symbol === 'SUI' && (toPair.token.symbol === 'USDC' || toPair.token.symbol === 'USDT')
+      : fromPair.token.symbol === 'SUI' && toPair.token.symbol === 'USDC'
         ? 3.74
-        : (fromPair.token.symbol === 'USDC' || fromPair.token.symbol === 'USDT') && toPair.token.symbol === 'SUI'
+        : fromPair.token.symbol === 'USDC' && toPair.token.symbol === 'SUI'
           ? 1 / 3.74
           : 0.5 + Math.random() * 2;
 
@@ -196,8 +218,14 @@ function CompactDEX() {
   };
 
   const handleFromAmountChange = (value: string) => {
+    // Prevent negative values
+    const numValue = parseFloat(value);
+    if (value !== "" && (isNaN(numValue) || numValue < 0)) {
+      return; // Don't update state for invalid values
+    }
+    
     setFromAmount(value);
-    if (value && parseFloat(value) > 0) {
+    if (value && numValue > 0) {
       calculateToAmount(value);
     } else {
       setToAmount("");
@@ -228,13 +256,9 @@ function CompactDEX() {
       .map(byte => byte.toString(16).padStart(2, '0'))
       .join('');
 
-    // Create SHA-256 hash of the secret using Web Crypto API
-    const encoder = new TextEncoder();
-    const data = encoder.encode(secret);
-
     // Since we need this synchronously, we'll use a simpler approach
     // In production, you'd want to use crypto.subtle.digest() which is async
-    const hashLock = ethers.keccak256(ethers.toUtf8Bytes(secret));
+    const hashLock = ethers.keccak256(ethers.getBytes('0x' + secret));
 
     return { hashLock, secret };
   };
@@ -392,7 +416,7 @@ function CompactDEX() {
 
         // Store the secret for this order hash
         setOrderSecrets(prev => new Map(prev).set(orderHash, secret));
-        
+
         // Store order details for this hash
         setOrderDetails(prev => new Map(prev).set(orderHash, {
           fromAmount,
@@ -524,14 +548,14 @@ function CompactDEX() {
         const { detectSuiWallets } = await import('./hooks/useWallet');
         const availableWallets = await detectSuiWallets();
         console.log('Available wallets for transaction:', availableWallets);
-        
+
         if (availableWallets.length === 0) {
           throw new Error('No SUI wallet found for transaction signing.');
         }
 
         const selectedWallet = availableWallets[0];
         console.log('Using wallet for transaction:', selectedWallet);
-        
+
         let suiWallet: any = selectedWallet.wallet || selectedWallet;
 
         // Establish wallet account context for transaction signing
@@ -571,7 +595,7 @@ function CompactDEX() {
           }
 
           const suiClient = new SuiClient({
-            url: 'https://fullnode.testnet.sui.io:443'
+            url: 'https://fullnode.mainnet.sui.io:443'
           });
 
           let transaction;
@@ -591,17 +615,17 @@ function CompactDEX() {
           // Prioritize wallet standard signing features
           if (suiWallet.features && suiWallet.features['sui:signTransaction']) {
             console.log('Using wallet standard sui:signTransaction');
-            signedTx = await suiWallet.features['sui:signTransaction'].signTransaction({ 
+            signedTx = await suiWallet.features['sui:signTransaction'].signTransaction({
               transaction: transaction,
-              chain: 'sui:testnet'
+              chain: 'sui:mainnet'
             });
           } else if (suiWallet.features && suiWallet.features['sui:signAndExecuteTransaction']) {
             console.log('Using wallet standard sui:signAndExecuteTransaction');
-            signedTx = await suiWallet.features['sui:signAndExecuteTransaction'].signAndExecuteTransaction({ 
+            signedTx = await suiWallet.features['sui:signAndExecuteTransaction'].signAndExecuteTransaction({
               transaction: transaction,
-              chain: 'sui:testnet'
+              chain: 'sui:mainnet'
             });
-          } 
+          }
           // Legacy fallback for non-standard wallet interfaces
           else if (suiWallet.signTransaction) {
             console.log('Using direct signTransaction method');
@@ -673,7 +697,7 @@ function CompactDEX() {
 
           const executeResponseText = await executeResponse.text();
           console.log('Success response text:', executeResponseText);
-          
+
           const contentType = executeResponse.headers.get('content-type');
           console.log('Response content-type:', contentType);
 
@@ -688,7 +712,7 @@ function CompactDEX() {
 
                 // Store the secret for this order hash
                 setOrderSecrets(prev => new Map(prev).set(orderHash, secret));
-                
+
                 // Store order details for this hash
                 setOrderDetails(prev => new Map(prev).set(orderHash, {
                   fromAmount,
@@ -827,6 +851,8 @@ function CompactDEX() {
                       type="number"
                       placeholder="0.0"
                       value={fromAmount}
+                      min="0"
+                      step="any"
                       onChange={(e) =>
                         handleFromAmountChange(e.target.value)
                       }
@@ -896,7 +922,7 @@ function CompactDEX() {
                           {toPair.chain.name}
                         </div>
                       ) : (
-                        <div className="text-xs text-muted-foreground">
+                        <div className="text-sm text-muted-foreground">
                           Select destination
                         </div>
                       )}
@@ -1019,20 +1045,42 @@ function CompactDEX() {
                   const isPolling = pollingOrders.has(orderHash);
                   const status = orderStatuses.get(orderHash);
                   const details = orderDetails.get(orderHash);
+                  const transactions = orderTransactions.get(orderHash);
+                  const secretStatus = orderSecretStatus.get(orderHash);
                   const shortHash = `${orderHash.slice(0, 6)}...${orderHash.slice(-4)}`;
 
+                  // Helper function to get transaction explorer URL
+                  const getExplorerUrl = (txHash: string, chainType: 'ethereum' | 'sui') => {
+                    if (chainType === 'ethereum') {
+                      return `https://arbiscan.io/tx/${txHash}`;
+                    } else {
+                      return `https://suiscan.xyz/mainnet/tx/${txHash}`;
+                    }
+                  };
+
+                  // Determine transaction status messages
+                  const getTransactionMessages = (): string[] => {
+                    const messages: string[] = [];
+                    if (!transactions) return messages;
+
+                    if (transactions.escrowSrcTxHash) {
+                      messages.push("Source escrow transaction");
+                    }
+                    if (transactions.escrowDstTxHash) {
+                      messages.push("Destination escrow transaction");
+                    }
+                    return messages;
+                  };
+
                   return (
-                    <Button
+                    <div
                       key={orderHash}
-                      onClick={() => checkOrderStatus(orderHash)}
-                      disabled={isChecking}
-                      variant="outline"
-                      className={`w-full text-left justify-between h-auto p-3 ${isPolling ? 'border-blue-300 bg-blue-50/50 dark:border-blue-700 dark:bg-blue-950/20' : ''}`}
+                      className={`w-full text-left justify-between h-auto p-3 border border-border rounded-md bg-card ${isPolling ? 'border-blue-300 bg-blue-50/50 dark:border-blue-700 dark:bg-blue-950/20' : ''}`}
                     >
                       <div className="flex flex-col items-start gap-1">
                         <div className="flex items-center gap-2">
-                          <span 
-                            className="font-mono text-xs text-muted-foreground hover:text-blue-600 cursor-pointer" 
+                          <span
+                            className="font-mono text-xs text-muted-foreground hover:text-blue-600 cursor-pointer"
                             onClick={(e) => {
                               e.stopPropagation();
                               navigator.clipboard.writeText(`http://64.226.101.237:3000/api/swap/${orderHash}`);
@@ -1041,12 +1089,11 @@ function CompactDEX() {
                           >
                             {shortHash}
                           </span>
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${
-                            status === 'Pending' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400' :
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${status === 'Pending' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400' :
                             status === 'error' ? 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400' :
-                            status === 'Submitted' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400' :
-                            'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400'
-                          }`}>
+                              status === 'Submitted' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400' :
+                                'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400'
+                            }`}>
                             {status || 'Check Status'}
                           </span>
                         </div>
@@ -1055,14 +1102,79 @@ function CompactDEX() {
                             {details.fromAmount} {details.fromToken} ({details.fromNetwork}) → {details.toAmount} {details.toToken} ({details.toNetwork})
                           </div>
                         )}
+                        {transactions && (
+                          <div className="flex flex-col gap-1">
+                            {transactions.escrowSrcTxHash && (
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-blue-600 dark:text-blue-400">Source escrow transaction:</span>
+                                <span
+                                  className="font-mono text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 cursor-pointer underline"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const url = getExplorerUrl(transactions.escrowSrcTxHash!, details?.fromNetwork?.toLowerCase().includes('sui') ? 'sui' : 'ethereum');
+                                    window.open(url, '_blank');
+                                  }}
+                                >
+                                  {transactions.escrowSrcTxHash.slice(0, 8)}...{transactions.escrowSrcTxHash.slice(-6)}
+                                </span>
+                              </div>
+                            )}
+                            {transactions.escrowDstTxHash && (
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-blue-600 dark:text-blue-400">Destination escrow transaction:</span>
+                                <span
+                                  className="font-mono text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 cursor-pointer underline"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const url = getExplorerUrl(transactions.escrowDstTxHash!, details?.toNetwork?.toLowerCase().includes('sui') ? 'sui' : 'ethereum');
+                                    window.open(url, '_blank');
+                                  }}
+                                >
+                                  {transactions.escrowDstTxHash.slice(0, 8)}...{transactions.escrowDstTxHash.slice(-6)}
+                                </span>
+                              </div>
+                            )}
+                            {secretStatus && (secretStatus.revealed || secretStatus.failed) && (
+                              <div className="flex items-center gap-2">
+                                <span className={`text-xs ${secretStatus.revealed ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                  {secretStatus.revealed ? 'Secret revealed' : 'Secret revealing failed'}
+                                </span>
+                              </div>
+                            )}
+                            {transactions.escrowSrcWithdrawTxHash && (
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-blue-600 dark:text-blue-400">Source withdraw transaction:</span>
+                                <span
+                                  className="font-mono text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 cursor-pointer underline"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const url = getExplorerUrl(transactions.escrowSrcWithdrawTxHash!, details?.fromNetwork?.toLowerCase().includes('sui') ? 'sui' : 'ethereum');
+                                    window.open(url, '_blank');
+                                  }}
+                                >
+                                  {transactions.escrowSrcWithdrawTxHash.slice(0, 8)}...{transactions.escrowSrcWithdrawTxHash.slice(-6)}
+                                </span>
+                              </div>
+                            )}
+                            {transactions.escrowDstWithdrawTxHash && (
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-blue-600 dark:text-blue-400">Destination withdraw transaction:</span>
+                                <span
+                                  className="font-mono text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 cursor-pointer underline"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const url = getExplorerUrl(transactions.escrowDstWithdrawTxHash!, details?.toNetwork?.toLowerCase().includes('sui') ? 'sui' : 'ethereum');
+                                    window.open(url, '_blank');
+                                  }}
+                                >
+                                  {transactions.escrowDstWithdrawTxHash.slice(0, 8)}...{transactions.escrowDstWithdrawTxHash.slice(-6)}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
-                      {isChecking && (
-                        <div className="flex items-center gap-2">
-                          <div className="animate-spin h-3 w-3 border-2 border-primary border-t-transparent rounded-full"></div>
-                          <span className="text-xs">Checking...</span>
-                        </div>
-                      )}
-                    </Button>
+                    </div>
                   );
                 })}
               </div>
@@ -1092,7 +1204,7 @@ function CompactDEX() {
 export default function App() {
   return (
     <WalletProvider>
-      <CompactDEX />
+      <NetherSwap />
     </WalletProvider>
   );
 }

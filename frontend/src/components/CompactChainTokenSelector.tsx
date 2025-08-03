@@ -35,7 +35,7 @@ export function CompactChainTokenSelector({
         if (pair) onPairSelect(pair);
       }}
     >
-      <SelectTrigger className={`w-full ${className || ''}`}>
+      <SelectTrigger className={`w-full text-sm ${className || ''}`}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
