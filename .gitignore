@@ -16,3 +16,5 @@ evm/node_modules/
 # Deployments
 evm/deployments/
 evm/broadcast/
+
+sui/build/
