@@ -22,10 +22,7 @@ Nether Swap is a cross-chain decentralized exchange protocol that enables seamle
 
 ### SUI Contract Deployment
 
-1. Install SUI CLI:
-   ```bash
-   # Follow instructions at https://docs.sui.io/guides/developer/getting-started/sui-install
-   ```
+1. Install SUI CLI: https://docs.sui.io/guides/developer/getting-started/sui-install
 2. Request faucet tokens for testnet:
    ```bash
    sui client faucet
@@ -37,7 +34,7 @@ Nether Swap is a cross-chain decentralized exchange protocol that enables seamle
 
 ### Backend Setup
 
-1. Configure environment variables (see `.env.example` for required variables)
+1. Configure environment variables (see `backend/.env.example` for required variables)
 2. Navigate to the backend directory and run:
    ```bash
    cd backend/
@@ -45,6 +42,7 @@ Nether Swap is a cross-chain decentralized exchange protocol that enables seamle
    npm run start
    ```
 
+### Swap flow
 ![ETH to SUI Flow](assets/eth_to_sui.png)
 ![SUI to ETH Flow](assets/sui_to_eth.png)
 
