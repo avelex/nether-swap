@@ -11,6 +11,7 @@ export interface UserIntent {
   receiver: string;
 }
 
+
 export interface SwapOrder {
   orderHash: string;
   userIntent: UserIntent;
@@ -22,14 +23,30 @@ export interface SwapOrder {
   escrowDstWithdrawTxHash?: string;
   escrowSrcWithdrawTxHash?: string;
 
+
   createdAt: Date;
   updatedAt: Date;
   executedAt?: Date;
+
+  deployedAt?: number;
+
+  // Might be source and dest objectId
+  suiEscrowObjectId?: string; 
+  evmEscrowAddress?: string;
 }
 
 export interface EvmSwapOrder extends SwapOrder {
   typedData: Sdk.EIP712TypedData;
   order: Sdk.EvmCrossChainOrder;
+}
+
+export interface SuiSwapRequest {
+  userIntent: UserIntent;
+  userSignature: string;
+}
+
+export interface SuiSwapResponse {
+  orderHash: string;
 }
 
 export interface BuildSwapOrderRequest {

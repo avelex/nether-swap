@@ -85,7 +85,7 @@ export class EvmClient {
       gasLimit: 1_000_000,
       from: this.getAddress(),
     });
-    const receipt = await res.wait(3); //TODO: wait for 3 blocks, take from config
+    const receipt = await res.wait(5); //TODO: wait for 5 blocks, take from config
 
     if (receipt && receipt.status) {
       const block = await this.provider.getBlock(receipt.blockHash);

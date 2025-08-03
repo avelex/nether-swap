@@ -1,3 +1,4 @@
+import { keccak256, toUtf8Bytes } from 'ethers';
 import { EvmSwapOrder, SwapOrder } from '../types';
 import logger from '../utils/logger';
 
@@ -36,6 +37,42 @@ export class SwapOrderService {
     });
 
     return order;
+  }
+
+  public createSwapOrder(
+    orderData: Omit<SwapOrder, 'createdAt' | 'updatedAt' | 'orderHash'>,
+  ): SwapOrder {
+
+    const orderDataWithNonce = {
+      ...orderData,
+      nonce: Math.random().toString(), // или Date.now().toString()
+    };
+
+    const hash = keccak256(toUtf8Bytes(JSON.stringify(orderDataWithNonce)));
+
+    const order: SwapOrder = {
+      ...orderData,
+        orderHash: hash,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+    };
+    this.orders.set(order.orderHash, order);
+
+    // Track orders by user address
+    const userAddress = order.userIntent.userAddress.toLowerCase();
+    if (!this.userOrders.has(userAddress)) {
+      this.userOrders.set(userAddress, []);
+    }
+    this.userOrders.get(userAddress)!.push(order.orderHash);
+
+    logger.info('Swap order created', {
+      orderHash: order.orderHash,
+      userAddress: order.userIntent.userAddress,
+      srcChainId: order.userIntent.srcChainId,
+      dstChainId: order.userIntent.dstChainId,
+    });
+
+    return order
   }
 
   /**
@@ -165,11 +202,30 @@ export class SwapOrderService {
     };
 
     this.orders.set(orderHash, updatedOrder);
-
     logger.info('Escrow dst tx hash added to order', { orderHash });
-
     return updatedOrder;
   }
+
+  public addSuiEscrowObjectId(orderHash: string, objectId: string): SwapOrder | undefined {
+    const order = this.orders.get(orderHash);
+    if (!order) {
+      logger.warn('Attempted to add escrow dst tx hash to non-existent order', {
+        orderHash,
+      });
+      return undefined;
+    }
+
+    const updatedOrder: SwapOrder = {
+      ...order,
+      suiEscrowObjectId: objectId,
+      updatedAt: new Date(),
+    };
+
+    this.orders.set(orderHash, updatedOrder);
+    logger.info('Escrow dst tx hash added to order', { orderHash });
+    return updatedOrder;
+  }
+
   
   public addEscrowSrcWithdrawTxHash(orderHash: string, txHash: string): SwapOrder | undefined {
     const order = this.orders.get(orderHash);
@@ -211,6 +267,46 @@ export class SwapOrderService {
     this.orders.set(orderHash, updatedOrder);
 
     logger.info('Escrow dst withdraw tx hash added to order', { orderHash });
+
+    return updatedOrder;
+  }
+
+  public addDeployedAt(orderHash: string, deployedAt: number): SwapOrder | undefined {
+    const order = this.orders.get(orderHash);
+    if (!order) {
+      logger.warn('Attempted to add deployed at to non-existent order', { orderHash });
+      return undefined;
+    }
+
+    const updatedOrder: SwapOrder = {
+      ...order,
+      deployedAt,
+      updatedAt: new Date(),
+    };
+
+    this.orders.set(orderHash, updatedOrder);
+
+    logger.info('Deployed at added to order', { orderHash, deployedAt });
+
+    return updatedOrder;
+  }
+
+  public addEvmEscrowAddress(orderHash: string, escrowAddress: string): SwapOrder | undefined {
+    const order = this.orders.get(orderHash);
+    if (!order) {
+      logger.warn('Attempted to add evm escrow address to non-existent order', { orderHash });
+      return undefined;
+    }
+
+    const updatedOrder: SwapOrder = {
+      ...order,
+      evmEscrowAddress: escrowAddress,
+      updatedAt: new Date(),
+    };
+
+    this.orders.set(orderHash, updatedOrder);
+
+    logger.info('Evm escrow address added to order', { orderHash, escrowAddress });
 
     return updatedOrder;
   }
