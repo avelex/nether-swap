@@ -17,7 +17,6 @@ evm/node_modules/
 evm/deployments/
 evm/broadcast/
 
-
 # Production builds
 backend/dist/
 backend/build/
@@ -88,3 +87,4 @@ jest-coverage/
 
 # Backend
 backend/node_modules/
+sui/build/
